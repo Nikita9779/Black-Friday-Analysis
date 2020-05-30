@@ -42,6 +42,8 @@ BlackFriday<-na.omit(BlackFriday)
 View(BlackFriday)
 missmap(BlackFriday, col = c('yellow','black'), main = 'check') ##To check if their are any missing values and we had a full black plot so it indicate no missing values
 
+
+
 ####EDA(Exploratory Data Analysis)#####
 
 #Exploring the basics in data
@@ -87,6 +89,9 @@ head(user_purchase_gender)
 
 average_spending_gender = user_purchase_gender %>% group_by(Gender) %>% summarize(Purchase = sum(as.numeric(Total_Purchase)), Count = n(), Average = Purchase/Count)
 head(average_spending_gender)
+#We can see that that the average transaction for Females was 247325
+#and the average transaction for Males was 357568. Let visualize our results.
+
 
 ###Visual Representation#
 genderAverage  = ggplot(data = average_spending_gender) +
@@ -94,7 +99,8 @@ genderAverage  = ggplot(data = average_spending_gender) +
   labs(title = 'Average Spending by Gender') +
   scale_fill_brewer(palette = 'Set2')
 print(genderAverage)
-
+#Even though female shoppers make less purchases than males at this specific store, 
+#they seem to be purchasing almost as much on average as the male shoppers
 
                              #######Our top selling products#########
 
@@ -103,6 +109,12 @@ top_sellers = BlackFriday %>% count(Product_ID, sort = TRUE)
 
 top_5 = head(top_sellers, 5)
 top_5
+#  Product_ID     n
+#1 P00110742   1591
+#2 P00025442   1586
+#3 P00112142   1539
+#4 P00057642   1430
+#5 P00184942   1424
 ##Now that we have Identified our top 5 best selling products, lets examine the best selling product, P00110742.
 
 best_seller = BlackFriday[BlackFriday$Product_ID == 'P00110742', ]
@@ -159,7 +171,7 @@ print(customers_age_vis)
 
 by_age <- BlackFriday %>% group_by(Age) %>% summarise(Purchase = mean(Purchase))
 ggplot(by_age, aes(Age, Purchase)) + geom_bar( stat = 'identity',fill = c('#c5fafa', '#002ba1', '#6287ec', '#dd0244', '#c90000', '#fb0202', '#ff9ecb')) 
-# On average, each age group spends about the same. Younger age groups contribute more to the sales as a whole,
+#On average, each age group spends about the same. Younger age groups contribute more to the sales as a whole,
 #however, the age group that spends the most on average are 51-55.
 
 #####The Age Group Which bought the Best Selled Product
@@ -169,6 +181,7 @@ ageDist_bs  = ggplot(data = best_seller) +
   theme(axis.text.x = element_text(size = 10)) +
   scale_fill_brewer(palette = 'Paired') + 
   theme(legend.position="none")
+
 print(ageDist_bs)
 
 grid.arrange(customers_age_vis, ageDist_bs, ncol=2)
@@ -554,10 +567,10 @@ custom <- trainControl(method = "repeatedcv",
 
 set.seed(1234)
 lm <- train(Purchase ~ Gender+Age+Occupation+City_Category+Stay_In_Current_City_Years+
-                 Marital_Status+Product_Category_1,train, method = 'lm' , trControl = custom)
+                 Marital_Status+Product_Category_1+Product_Category_2+Product_Category_3,train, method = 'lm' , trControl = custom)
 summary(lm)
 lm$results
-plot(lm$finalModel , col = 'purple')
+
 
 
 ###Prediction On Train dataset
@@ -572,13 +585,14 @@ pred_test_lm <- predict(lm, test)
 test_sub_lm<- data.frame(test$User_ID,test$Product_ID,pred_test_lm,test$Purchase)
 head(test_sub_lm)
 
-sqrt(mean((test$Purchase-pred_test_lm)^2)) #3672.087
- 
+linearrmse <- sqrt(mean((test$Purchase-pred_test_lm)^2)) 
+linearrmse  #3598.808
+
                            ###########RIDGE REGRESSION############
 
 set.seed(1234)
 ridge <- train(Purchase ~ Gender+Age+Occupation+City_Category+Stay_In_Current_City_Years+
-                 Marital_Status+Product_Category_1,train, method = 'glmnet',tuneGrid = expand.grid(alpha = 0,lambda = seq(4,20,length = 8)),trControl = custom )
+                 Marital_Status+Product_Category_1+Product_Category_2+Product_Category_3,train, method = 'glmnet',tuneGrid = expand.grid(alpha = 0,lambda = seq(4,100,length = 8)),trControl = custom )
 
 ridge
 ridge$results
@@ -608,13 +622,14 @@ pred_test_rid <- predict(ridge, test)
 test_sub_rid <- data.frame(test$User_ID,test$Product_ID,pred_test_rid,test$Purchase)
 head(test_sub_rid)
 
-sqrt(mean((test$Purchase-pred_test_rid)^2)) #3674.9
+ridrmse <- sqrt(mean((test$Purchase-pred_test_rid)^2)) 
+ridrmse #3602.74
 
                             #########Lasso Regresssion########
 
 set.seed(1234)
 lasso <- train(Purchase ~ Gender+Age+Occupation+City_Category+Stay_In_Current_City_Years+
-                 Marital_Status+Product_Category_1,train, method = 'glmnet',tuneGrid = expand.grid(alpha = 1,lambda = seq(0.001,100,length = 5)),trControl = custom  )
+                 Marital_Status+Product_Category_1+Product_Category_2+Product_Category_3,train, method = 'glmnet',tuneGrid = expand.grid(alpha = 1,lambda = seq(0.0001,1,length = 5)),trControl = custom  )
 
 lasso
 lasso$results
@@ -640,13 +655,15 @@ test_sub_lasso <- data.frame(test$User_ID,test$Product_ID,pred_test_lasso,test$P
 head(test_sub_lasso)
 
 
-sqrt(mean((test$Purchase-pred_test_lasso)^2)) #3671.87
+lassormse <- sqrt(mean((test$Purchase-pred_test_lasso)^2)) 
+lassormse #3598.74
+
 
                                 #######Elastic Net Regression######
 
 set.seed(1234)
 elastic <- train(Purchase ~ Gender+Age+Occupation+City_Category+Stay_In_Current_City_Years+
-                   Marital_Status+Product_Category_1,train, method = 'glmnet',tuneGrid = expand.grid(alpha = seq(0,1, length = 10),lambda = seq(0.001,3, length = 5)), trControl = custom)
+                   Marital_Status+Product_Category_1+Product_Category_2+Product_Category_3, train, method = 'glmnet',tuneGrid = expand.grid(alpha = seq(0,1, length = 10),lambda = seq(0.0001,3, length = 5)), trControl = custom)
 
 
 elastic
@@ -672,11 +689,14 @@ pred_test_elastic <- predict(elastic, test)
 test_sub_elastic <- data.frame(test$User_ID,test$Product_ID,pred_test_elastic,test$Purchase)
 head(test_sub_elastic)
 
-sqrt(mean((test$Purchase-pred_test_elastic)^2)) #3671.84
+elasticrmse <- sqrt(mean((test$Purchase-pred_test_elastic)^2)) 
+elasticrmse #3598.74
 
                             ###########Decision Tree#########
 
-model_dt <- rpart(Purchase~Gender+Marital_Status+Product_Category_1+Age+Occupation+Stay_In_Current_City_Years+City_Category, data = train)
+model_dt <- rpart(Purchase~Gender+Age+Occupation+City_Category+Stay_In_Current_City_Years+
+                    Marital_Status+Product_Category_1+Product_Category_2+Product_Category_3, 
+                  data = train)
 
 model_dt
 summary(model_dt)
@@ -686,30 +706,25 @@ plotcp(model_dt)
 #plotting the tree
 rpart.plot(model_dt,extra = 3)
 
-#pruning the tree
-model_dt_prune <- prune(model_dt, cp=0.01)
-rpart.plot(model_dt_prune)
-
 #predicting on the test dataset 
-pred_test_dt <- predict(model_dt_prune, test)
+pred_test_dt <- predict(model_dt, test)
 test_sub_dt <- data.frame(test$User_ID,test$Product_ID,pred_test_dt,test$Purchase)
 head(test_sub_dt)
-test_sub_dt
-
-sqrt(mean((test$Purchase-pred_test_dt)^2)) ##3728.4
 
 
+DecisionT <- sqrt(mean((test$Purchase-pred_test_dt)^2)) 
+DecisionT #3683.911
+ 
 
                             ########Random forest#############
 
 set.seed(123)
 model_rf <- randomForest(Purchase ~ Gender+Age+Occupation+City_Category+Stay_In_Current_City_Years+
-                           Marital_Status+Product_Category_1, data = train, ntree = 40)
-
+                           Marital_Status+Product_Category_1+Product_Category_2+Product_Category_3, data = train, ntree = 15)
 model_rf$ntree
 model_rf$importance
 
-summary(model_rf)
+
 print(model_rf)
 plot(model_rf)
 
@@ -718,17 +733,99 @@ plot(model_rf)
 pred_test_rf <- predict(model_rf, test)
 test_sub_rf <- data.frame(test$User_ID,test$Product_ID,pred_test_rf,test$Purchase)
 head(test_sub_rf)
-test_sub_rf
 
 
-sqrt(mean((test$Purchase-pred_test_rf)^2)) #3625.367
+
+RandomF <- sqrt(mean((test$Purchase-pred_test_rf)^2)) 
+RandomF  #3541.019
 
 ##################################
 
 #Comparing the model
-model_list <- list(LinearModel = lm, Ridge = ridge, Lasso = lasso , Elasticnet = elastic)
-res <- resamples(model_list)
-summary(res)
-bwplot(res)
+model_list <- data.frame("Model Name" = c( "LinearModel" , "RidgeModel", "LassoModel" , "Elasticnet" , "DecisionTree" , "RandomForest"), "RMSE Value" = c(linearrmse , ridrmse, lassormse,elasticrmse, DecisionT, RandomF))
+df <-model_list[order(-model_list$RMSE.Value),]
+print(df)
+
+#####################################################################
+###########ASSOCIATION RULE##############
+library(arules)
+library(arulesViz)
+library(tidyverse)
+
+# Data Preprocessing
+# Getting the dataset into the correct format
+customers_products = BlackFriday %>%
+  select(User_ID, Product_ID) %>%   # Selecting the columns we will need
+  group_by(User_ID) %>%             # Grouping by "User_ID"          
+  arrange(User_ID) %>%              # Arranging by "User_ID" 
+  mutate(id = row_number()) %>%     # Defining a key column for each "Product_ID" and its corresponding "User_ID" (Must do this for spread() to work properly)
+  spread(User_ID, Product_ID) %>%   # Converting our dataset from tall to wide format, and grouping "Product_IDs" to their corresponding "User_ID"
+  t()                               # Transposing the dataset from columns of "User_ID" to rows of "User_ID"
+
+# Now we can remove the Id row we created earlier for spread() to work correctly.
+customers_products = customers_products[-1,]
+
+write.csv(customers_products, file = 'customers_products.csv')
+
+customersProducts = read.transactions('customers_products.csv', sep = ',', rm.duplicates = TRUE) # remove duplicates with rm.duplicates
+
+#Before we implement the Apriori algorithm to our problem, 
+#lets take a look at our newly created sparse matrix.
+summary(customersProducts)
+
+#we can see that there are 5869 rows (elements/itemsets/transactions) and 6613 columns (items) in our sparse matrix. With this sumary function, we get a density of 0.0043 in our matrix. 
+#The density tells us that we have 0.5% non-zero values (1) in our sparse matrix and 99.5% zero (0) values.
+
+#as we discovered in our Exploratory Data Analysis, 
+#the summary() function also gives us the most frequent items that customers purchased 
+#and just to be sure, we can cross reference what we discovered earlier in the analysis. 
+#Lets list out what our sparse matrix gave us.
+
+#P00110742 P00025442 P00112142 P00057642 P00184942   (Other) 
+#1591      1586      1539      1430      1424    162795 
+
+#Now lets compare it to what we discovered earler.
+
+#"Looks like our top 5 best sellers are (by product ID)"
+#  Product_ID     n
+#1 P00110742   1591
+#2 P00025442   1586
+#3 P00112142   1539
+#4 P00057642   1430
+#5 P00184942   1424
+
+#Awesome! Looks like our sparce matrix is accurate to what we discovered earlier.
 
 
+itemFrequencyPlot(customersProducts, topN = 25)    # topN is limiting to the top 50 products
+
+##Rule
+rules = apriori(data = customersProducts,
+                parameter = list(support = 0.008, confidence = 0.80, maxtime = 0)) # maxtime = 0 will allow our algorithim to run until completion with no time limit
+
+#It looks like apriori has created 4 rules in accordance to our specified parameters.
+#"writing ... [4 rule(s)] done [0.13s]."
+#Now, lets examine our results to get a better idea of how our algoritm worked.
+
+inspect(sort(rules, by = 'lift'))
+#PLOT
+plot(rules, method = 'graph')
+
+
+#Lets now try modifying some of the parameters for the Apriori algotrithm and see the results.
+#This time, we will decrease our confidence value to 75% and keep our support value the same (0.008).
+
+rules = apriori(data = customersProducts,parameter = list(support = 0.008, confidence = 0.75, maxtime = 0))
+#Now that we have decreased the minimum confidence value to 75%, we have a total of 52 rules.
+
+inspect(head(sort(rules, by = 'lift'))) # limiting to the top 6 rules
+#We can now see that we now have a new set of rules and the rule with the highest lift value has also changed.
+#Rule number 1 shows that Customers who bought items P00032042,P00057642,P00102642,P00145042 will also purchase item P00270942 ~ 88% of the time, given a support of 0.008.
+
+plot(rules, method = 'graph', max = 25)
+#Now that we have more that 7 rules, this visualization becomes alot more difficult to interpret.
+#Instead, we can create a matrix and have a similar plot and clearer interpretation.
+
+plot(rules, method = 'grouped', max = 25,col = "Pink")
+#In this visualization, we can see that we have our LHS on top and on the right hand side, the corresponding RHS. 
+#The size of the bubbles represents the support value of the rule and the fill/color represents the lift.
